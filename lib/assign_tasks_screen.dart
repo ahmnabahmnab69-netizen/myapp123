@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:todo_smart/main.dart';
+import 'package:todo_smart/task.dart';
 import 'package:todo_smart/task_library.dart';
 
 class AssignTasksScreen extends StatefulWidget {
@@ -17,7 +17,7 @@ class AssignTasksScreen extends StatefulWidget {
 
 class _AssignTasksScreenState extends State<AssignTasksScreen> {
   List<Task> _unassignedTasks = [];
-  final Set<Task> _selectedTasks = {};
+  final Set<String> _selectedTaskIds = {};
 
   @override
   void initState() {
@@ -46,12 +46,12 @@ class _AssignTasksScreenState extends State<AssignTasksScreen> {
     final prefs = await SharedPreferences.getInstance();
     final tasksJson = prefs.getStringList('tasks');
     if (tasksJson != null) {
-      final allTasks = tasksJson
+      List<Task> allTasks = tasksJson
           .map((taskJson) => Task.fromJson(json.decode(taskJson)))
           .toList();
 
-      for (final selectedTask in _selectedTasks) {
-        final taskIndex = allTasks.indexWhere((t) => t.id == selectedTask.id);
+      for (final taskId in _selectedTaskIds) {
+        final taskIndex = allTasks.indexWhere((t) => t.id == taskId);
         if (taskIndex != -1) {
           allTasks[taskIndex].libraryId = widget.library.id;
         }
@@ -63,7 +63,7 @@ class _AssignTasksScreenState extends State<AssignTasksScreen> {
       await prefs.setStringList('tasks', updatedTasksJson);
     }
     if (mounted) {
-      context.pop();
+      context.pop(true); // Return true to indicate a change was made
     }
   }
 
@@ -119,7 +119,7 @@ class _AssignTasksScreenState extends State<AssignTasksScreen> {
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
                       final task = _unassignedTasks[index];
-                      final isSelected = _selectedTasks.contains(task);
+                      final isSelected = _selectedTaskIds.contains(task.id);
                       return Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
                         child: Card(
@@ -132,9 +132,9 @@ class _AssignTasksScreenState extends State<AssignTasksScreen> {
                             onChanged: (bool? value) {
                               setState(() {
                                 if (value == true) {
-                                  _selectedTasks.add(task);
+                                  _selectedTaskIds.add(task.id);
                                 } else {
-                                  _selectedTasks.remove(task);
+                                  _selectedTaskIds.remove(task.id);
                                 }
                               });
                             },
@@ -161,12 +161,12 @@ class _AssignTasksScreenState extends State<AssignTasksScreen> {
           ],
         ),
       ),
-      floatingActionButton: _selectedTasks.isNotEmpty
+      floatingActionButton: _selectedTaskIds.isNotEmpty
           ? FloatingActionButton.extended(
               onPressed: _assignTasksToLibrary,
               icon: const Icon(Icons.assignment_turned_in_outlined),
               label: Text(
-                'Assign ${_selectedTasks.length} Tasks',
+                'Assign ${_selectedTaskIds.length} Tasks',
                 style: theme.textTheme.labelLarge,
               ),
               backgroundColor: theme.colorScheme.primary,

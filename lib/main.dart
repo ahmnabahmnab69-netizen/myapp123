@@ -5,16 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
-import 'package:json_annotation/json_annotation.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:todo_smart/background_service.dart';
 import 'package:todo_smart/countdown_screen.dart';
 import 'package:todo_smart/router.dart';
+import 'package:todo_smart/task.dart';
 import 'package:todo_smart/task_library.dart';
 import 'package:window_manager/window_manager.dart';
-
-part 'main.g.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
@@ -22,26 +20,24 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // --- Notification and Service Initialization ---
   await _initializeNotifications();
   if (!kIsWeb) {
     if (Platform.isAndroid || Platform.isIOS) {
       await initializeService();
     }
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-        await windowManager.ensureInitialized();
-        WindowOptions windowOptions = const WindowOptions(
+      await windowManager.ensureInitialized();
+      WindowOptions windowOptions = const WindowOptions(
         size: Size(400, 800),
         center: true,
         title: 'to-do smart',
-        );
-        windowManager.waitUntilReadyToShow(windowOptions, () async {
+      );
+      windowManager.waitUntilReadyToShow(windowOptions, () async {
         await windowManager.show();
         await windowManager.focus();
-        });
+      });
     }
   }
-  // ---------------------------------------------
 
   runApp(
     ChangeNotifierProvider(
@@ -69,19 +65,33 @@ Future<void> _initializeNotifications() async {
   );
 
   await flutterLocalNotificationsPlugin.initialize(
-    settings: initializationSettings,
+    initializationSettings,
+    onDidReceiveNotificationResponse:
+        (NotificationResponse notificationResponse) async {
+      // Handle notification tapped
+    },
   );
 
-  // Request permissions for iOS
-  if (!kIsWeb && Platform.isIOS) {
-    await flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<
-            IOSFlutterLocalNotificationsPlugin>()
-        ?.requestPermissions(
-          alert: true,
-          badge: true,
-          sound: true,
-        );
+  if (!kIsWeb) {
+    if (Platform.isIOS) {
+      await flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<
+              IOSFlutterLocalNotificationsPlugin>()
+          ?.requestPermissions(
+            alert: true,
+            badge: true,
+            sound: true,
+          );
+    } else if (Platform.isMacOS) {
+      await flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<
+              MacOSFlutterLocalNotificationsPlugin>()
+          ?.requestPermissions(
+            alert: true,
+            badge: true,
+            sound: true,
+          );
+    }
   }
 }
 
@@ -91,7 +101,8 @@ class ThemeProvider with ChangeNotifier {
   ThemeMode get themeMode => _themeMode;
 
   void toggleTheme() {
-    _themeMode = _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+    _themeMode =
+        _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
     notifyListeners();
   }
 }
@@ -104,10 +115,13 @@ class MyApp extends StatelessWidget {
     const Color primarySeedColor = Colors.cyan;
 
     final TextTheme appTextTheme = TextTheme(
-      displayLarge: GoogleFonts.orbitron(fontSize: 57, fontWeight: FontWeight.bold, color: Colors.white),
-      titleLarge: GoogleFonts.jura(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+      displayLarge: GoogleFonts.orbitron(
+          fontSize: 57, fontWeight: FontWeight.bold, color: Colors.white),
+      titleLarge: GoogleFonts.jura(
+          fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
       bodyMedium: GoogleFonts.jura(fontSize: 16, color: Colors.white70),
-      labelLarge: GoogleFonts.orbitron(fontSize: 16, fontWeight: FontWeight.bold),
+      labelLarge:
+          GoogleFonts.orbitron(fontSize: 16, fontWeight: FontWeight.bold),
     );
 
     final ThemeData lightTheme = ThemeData(
@@ -116,10 +130,12 @@ class MyApp extends StatelessWidget {
         seedColor: primarySeedColor,
         brightness: Brightness.light,
       ),
-      textTheme: appTextTheme.apply(bodyColor: Colors.black87, displayColor: Colors.black87),
+      textTheme: appTextTheme.apply(
+          bodyColor: Colors.black87, displayColor: Colors.black87),
       scaffoldBackgroundColor: Colors.grey.shade200,
       appBarTheme: AppBarTheme(
-        titleTextStyle: GoogleFonts.orbitron(fontSize: 24, fontWeight: FontWeight.bold),
+        titleTextStyle:
+            GoogleFonts.orbitron(fontSize: 24, fontWeight: FontWeight.bold),
       ),
     );
 
@@ -135,7 +151,8 @@ class MyApp extends StatelessWidget {
       appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
-        titleTextStyle: GoogleFonts.orbitron(fontSize: 24, fontWeight: FontWeight.bold),
+        titleTextStyle:
+            GoogleFonts.orbitron(fontSize: 24, fontWeight: FontWeight.bold),
       ),
     );
 
@@ -159,30 +176,6 @@ class MyHomePage extends StatefulWidget {
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
-}
-
-@JsonSerializable()
-class Task {
-  final String id;
-  final String title;
-  final String time;
-  final int xp;
-  bool isCompleted;
-  bool isCompletable;
-  String? libraryId;
-
-  Task({
-    required this.id,
-    required this.title, 
-    required this.time, 
-    required this.xp, 
-    this.isCompleted = false,
-    this.isCompletable = false,
-    this.libraryId,
-  });
-
-  factory Task.fromJson(Map<String, dynamic> json) => _$TaskFromJson(json);
-  Map<String, dynamic> toJson() => _$TaskToJson(this);
 }
 
 class LevelingSystem {
@@ -249,10 +242,9 @@ class _MyHomePageState extends State<MyHomePage> {
     await _loadXp();
   }
 
-
   Future<void> _loadXp() async {
     final prefs = await SharedPreferences.getInstance();
-    if(mounted){
+    if (mounted) {
       setState(() {
         _totalXp = prefs.getInt('totalXp') ?? 0;
         _users[0] = User(name: 'You', totalXp: _totalXp);
@@ -269,7 +261,7 @@ class _MyHomePageState extends State<MyHomePage> {
     final prefs = await SharedPreferences.getInstance();
     final librariesJson = prefs.getStringList('libraries');
     if (librariesJson != null) {
-      if(mounted){
+      if (mounted) {
         setState(() {
           _libraries = librariesJson
               .map((libJson) => TaskLibrary.fromJson(json.decode(libJson)))
@@ -283,17 +275,20 @@ class _MyHomePageState extends State<MyHomePage> {
     final prefs = await SharedPreferences.getInstance();
     final tasksJson = prefs.getStringList('tasks');
     if (tasksJson != null) {
-      _tasks = tasksJson.map((taskJson) => Task.fromJson(json.decode(taskJson))).toList();
+      _tasks = tasksJson
+          .map((taskJson) => Task.fromJson(json.decode(taskJson)))
+          .toList();
     }
-    
+
     await _syncTaskStatus();
   }
 
   Future<void> _syncTaskStatus() async {
     final prefs = await SharedPreferences.getInstance();
-    final unlockedTaskTitles = prefs.getStringList('unlocked_task_titles') ?? [];
-    
-    if(mounted){
+    final unlockedTaskTitles =
+        prefs.getStringList('unlocked_task_titles') ?? [];
+
+    if (mounted) {
       setState(() {
         for (var task in _tasks) {
           if (unlockedTaskTitles.contains(task.title)) {
@@ -306,12 +301,13 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> _saveTasks() async {
     final prefs = await SharedPreferences.getInstance();
-    final tasksJson = _tasks.map((task) => json.encode(task.toJson())).toList();
+    final tasksJson =
+        _tasks.map((task) => json.encode(task.toJson())).toList();
     await prefs.setStringList('tasks', tasksJson);
   }
 
   void _addTask(Task task) {
-    if(mounted){
+    if (mounted) {
       setState(() {
         _tasks.add(task);
       });
@@ -320,7 +316,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _deleteTask(Task task) {
-    if(mounted){
+    if (mounted) {
       setState(() {
         _tasks.remove(task);
       });
@@ -329,7 +325,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _onTaskCompletionChanged(Task task, bool isCompleted) {
-    if(mounted){
+    if (mounted) {
       setState(() {
         task.isCompleted = isCompleted;
         if (isCompleted) {
@@ -343,11 +339,15 @@ class _MyHomePageState extends State<MyHomePage> {
     _saveTasks();
     _saveXp();
   }
-  
+
   void _handleFocus(Task task) async {
     TaskLibrary? library;
     if (task.libraryId != null) {
-      library = _libraries.firstWhere((lib) => lib.id == task.libraryId);
+      try {
+        library = _libraries.firstWhere((lib) => lib.id == task.libraryId);
+      } catch (e) {
+        library = null; // Handle case where library is not found
+      }
     }
     _startFocusSession(task, library);
   }
@@ -360,8 +360,10 @@ class _MyHomePageState extends State<MyHomePage> {
     final currentUser = _users[0];
     final currentLevel = LevelingSystem.getLevel(currentUser.totalXp);
     final xpForNextLevel = LevelingSystem.getXpForNextLevel(currentLevel);
-    final xpForCurrentLevel = LevelingSystem.getXpForCurrentLevel(currentLevel);
-    final progress = (currentUser.totalXp - xpForCurrentLevel) / (xpForNextLevel - xpForCurrentLevel);
+    final xpForCurrentLevel =
+        LevelingSystem.getXpForCurrentLevel(currentLevel);
+    final progress = (currentUser.totalXp - xpForCurrentLevel) /
+        (xpForNextLevel - xpForCurrentLevel);
 
     final List<Widget> slivers = [
       SliverAppBar(
@@ -369,12 +371,16 @@ class _MyHomePageState extends State<MyHomePage> {
         pinned: true,
         expandedHeight: 120.0,
         flexibleSpace: FlexibleSpaceBar(
-          title: Text('to-do smart', style: theme.textTheme.titleLarge?.copyWith(color: theme.colorScheme.onSurface)),
+          title: Text('to-do smart',
+              style: theme.textTheme.titleLarge
+                  ?.copyWith(color: theme.colorScheme.onSurface)),
           centerTitle: true,
         ),
         actions: [
           IconButton(
-            icon: Icon(themeProvider.themeMode == ThemeMode.dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined),
+            icon: Icon(themeProvider.themeMode == ThemeMode.dark
+                ? Icons.light_mode_outlined
+                : Icons.dark_mode_outlined),
             onPressed: () => themeProvider.toggleTheme(),
             tooltip: 'Toggle Theme',
           ),
@@ -385,6 +391,21 @@ class _MyHomePageState extends State<MyHomePage> {
               _loadEverything();
             },
             tooltip: 'Manage Libraries',
+          ),
+          IconButton(
+            icon: const Icon(Icons.emoji_events_outlined),
+            onPressed: () {
+              final completedTasks =
+                  _tasks.where((task) => task.isCompleted).length;
+              context.push(
+                '/achievements',
+                extra: {
+                  'completedTasks': completedTasks,
+                  'totalXp': _totalXp,
+                },
+              );
+            },
+            tooltip: 'Achievements',
           ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
@@ -399,7 +420,8 @@ class _MyHomePageState extends State<MyHomePage> {
           child: Card(
             elevation: 8,
             shadowColor: theme.colorScheme.primary.withAlpha(100),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
             child: Padding(
               padding: const EdgeInsets.all(20.0),
               child: Column(
@@ -411,20 +433,26 @@ class _MyHomePageState extends State<MyHomePage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text('Total XP', style: theme.textTheme.bodyMedium),
-                          Text('$_totalXp', style: theme.textTheme.displayLarge?.copyWith(fontSize: 40)),
+                          Text('$_totalXp',
+                              style: theme.textTheme.displayLarge
+                                  ?.copyWith(fontSize: 40)),
                         ],
                       ),
                       ElevatedButton.icon(
-                        onPressed: () => context.push('/leaderboard', extra: _users),
+                        onPressed: () =>
+                            context.push('/leaderboard', extra: _users),
                         icon: const Icon(Icons.leaderboard_outlined),
-                        label: Text('Leaderboard', style: theme.textTheme.labelLarge),
+                        label: Text('Leaderboard',
+                            style: theme.textTheme.labelLarge),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: theme.colorScheme.primary.withAlpha(204),
+                          backgroundColor:
+                              theme.colorScheme.primary.withAlpha(204),
                           foregroundColor: theme.colorScheme.onPrimary,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 10),
                         ),
                       )
                     ],
@@ -435,8 +463,11 @@ class _MyHomePageState extends State<MyHomePage> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Level $currentLevel', style: theme.textTheme.bodyMedium),
-                          Text('$xpForNextLevel XP to Level ${currentLevel + 1}', style: theme.textTheme.bodyMedium),
+                          Text('Level $currentLevel',
+                              style: theme.textTheme.bodyMedium),
+                          Text(
+                              '$xpForNextLevel XP to Level ${currentLevel + 1}',
+                              style: theme.textTheme.bodyMedium),
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -445,7 +476,8 @@ class _MyHomePageState extends State<MyHomePage> {
                         minHeight: 10,
                         borderRadius: BorderRadius.circular(5),
                         backgroundColor: Colors.grey.shade700,
-                        valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                            theme.colorScheme.primary),
                       ),
                     ],
                   ),
@@ -456,39 +488,46 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       ),
       SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            child: Row(
-              children: [
-                Icon(Icons.list, color: theme.colorScheme.primary, size: 20),
-                const SizedBox(width: 10),
-                Text(
-                  'Tasks',
-                  style: theme.textTheme.titleLarge?.copyWith(fontSize: 20, color: theme.colorScheme.onSurface),
-                ),
-              ],
-            ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          child: Row(
+            children: [
+              Icon(Icons.list, color: theme.colorScheme.primary, size: 20),
+              const SizedBox(width: 10),
+              Text(
+                'Tasks',
+                style: theme.textTheme.titleLarge?.copyWith(
+                    fontSize: 20, color: theme.colorScheme.onSurface),
+              ),
+            ],
           ),
         ),
-        SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (context, index) {
-              final task = _tasks[index];
-              TaskLibrary? library;
-              if (task.libraryId != null) {
-                library = _libraries.firstWhere((lib) => lib.id == task.libraryId, orElse: () => TaskLibrary(id: '', name: 'Unknown Library'));
+      ),
+      SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            final task = _tasks[index];
+            TaskLibrary? library;
+            if (task.libraryId != null) {
+              try {
+                library = _libraries.firstWhere(
+                    (lib) => lib.id == task.libraryId);
+              } catch (e) {
+                library = null;
               }
-              return TaskCard(
-                task: task,
-                library: library,
-                onCompleted: (isCompleted) => _onTaskCompletionChanged(task, isCompleted),
-                onDeleted: () => _deleteTask(task),
-                onFocus: () => _handleFocus(task),
-              );
-            },
-            childCount: _tasks.length,
-          ),
+            }
+            return TaskCard(
+              task: task,
+              library: library,
+              onCompleted: (isCompleted) =>
+                  _onTaskCompletionChanged(task, isCompleted),
+              onDeleted: () => _deleteTask(task),
+              onFocus: () => _handleFocus(task),
+            );
+          },
+          childCount: _tasks.length,
         ),
+      ),
     ];
 
     return Scaffold(
@@ -499,7 +538,11 @@ class _MyHomePageState extends State<MyHomePage> {
             end: Alignment.bottomRight,
             colors: theme.brightness == Brightness.dark
                 ? [Colors.black, Colors.grey[900]!, Colors.black]
-                : [Colors.grey.shade100, Colors.grey.shade300, Colors.grey.shade100],
+                : [
+                    Colors.grey.shade100,
+                    Colors.grey.shade300,
+                    Colors.grey.shade100
+                  ],
           ),
         ),
         child: CustomScrollView(
@@ -629,7 +672,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _startFocusSession(Task task, TaskLibrary? library) async {
     if (library != null) {
-      if(mounted){
+      if (mounted) {
         setState(() {
           task.libraryId = library.id;
         });
@@ -652,10 +695,10 @@ class TaskCard extends StatefulWidget {
   final VoidCallback onDeleted;
   final VoidCallback onFocus;
   const TaskCard({
-    super.key, 
-    required this.task, 
+    super.key,
+    required this.task,
     this.library,
-    required this.onCompleted, 
+    required this.onCompleted,
     required this.onDeleted,
     required this.onFocus,
   });
@@ -685,19 +728,23 @@ class _TaskCardState extends State<TaskCard> {
         child: Card(
           elevation: 5,
           shadowColor: Colors.black.withAlpha(128),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
           child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             leading: Checkbox(
               value: widget.task.isCompleted,
-              onChanged: widget.task.isCompletable ? (bool? value) {
-                if(mounted){
-                  setState(() {
-                    widget.task.isCompleted = value!;
-                  });
-                }
-                widget.onCompleted(value!);
-              } : null,
+              onChanged: widget.task.isCompletable
+                  ? (bool? value) {
+                      if (mounted) {
+                        setState(() {
+                          widget.task.isCompleted = value!;
+                        });
+                      }
+                      widget.onCompleted(value!);
+                    }
+                  : null,
               shape: const CircleBorder(),
               activeColor: theme.colorScheme.primary,
             ),
@@ -705,8 +752,14 @@ class _TaskCardState extends State<TaskCard> {
               widget.task.title,
               style: theme.textTheme.titleLarge?.copyWith(
                 fontSize: 18,
-                decoration: widget.task.isCompleted ? TextDecoration.lineThrough : TextDecoration.none,
-                color: widget.task.isCompleted ? (theme.brightness == Brightness.dark ? Colors.white54 : Colors.black54) : null,
+                decoration: widget.task.isCompleted
+                    ? TextDecoration.lineThrough
+                    : TextDecoration.none,
+                color: widget.task.isCompleted
+                    ? (theme.brightness == Brightness.dark
+                        ? Colors.white54
+                        : Colors.black54)
+                    : null,
               ),
             ),
             subtitle: Column(
@@ -715,7 +768,11 @@ class _TaskCardState extends State<TaskCard> {
                 Text(
                   '${widget.task.time}  •  ${widget.task.xp} XP',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: widget.task.isCompleted ? (theme.brightness == Brightness.dark ? Colors.white38 : Colors.black38) : null,
+                    color: widget.task.isCompleted
+                        ? (theme.brightness == Brightness.dark
+                            ? Colors.white38
+                            : Colors.black38)
+                        : null,
                   ),
                 ),
                 if (widget.library != null)
@@ -725,14 +782,22 @@ class _TaskCardState extends State<TaskCard> {
                       'Library: ${widget.library!.name}',
                       style: theme.textTheme.bodyMedium?.copyWith(
                         fontStyle: FontStyle.italic,
-                        color: widget.task.isCompleted ? (theme.brightness == Brightness.dark ? Colors.white38 : Colors.black38) : null,
+                        color: widget.task.isCompleted
+                            ? (theme.brightness == Brightness.dark
+                                ? Colors.white38
+                                : Colors.black38)
+                            : null,
                       ),
                     ),
                   ),
               ],
             ),
             trailing: IconButton(
-              icon: Icon(Icons.play_circle_fill_rounded, color: theme.brightness == Brightness.dark ? Colors.white70 : Colors.black54, size: 30),
+              icon: Icon(Icons.play_circle_fill_rounded,
+                  color: theme.brightness == Brightness.dark
+                      ? Colors.white70
+                      : Colors.black54,
+                  size: 30),
               onPressed: widget.onFocus,
             ),
           ),

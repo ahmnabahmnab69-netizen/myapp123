@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:todo_smart/achievements_screen.dart';
 import 'package:todo_smart/leaderboard_screen.dart';
 import 'package:todo_smart/library_management_screen.dart';
 import 'package:todo_smart/main.dart';
@@ -31,6 +32,16 @@ final GoRouter router = GoRouter(
       path: '/settings',
       builder: (BuildContext context, GoRouterState state) {
         return const SettingsScreen();
+      },
+    ),
+     GoRoute(
+        path: '/achievements',
+        builder: (BuildContext context, GoRouterState state) {
+        final Map<String, int> data = state.extra as Map<String, int>;
+        return AchievementsScreen(
+          completedTasks: data['completedTasks'] ?? 0,
+          totalXp: data['totalXp'] ?? 0,
+        );
       },
     ),
   ],

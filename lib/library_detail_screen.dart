@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:todo_smart/main.dart';
+import 'package:todo_smart/task.dart';
 import 'package:todo_smart/task_library.dart';
 
 class LibraryDetailScreen extends StatefulWidget {
@@ -31,11 +31,13 @@ class _LibraryDetailScreenState extends State<LibraryDetailScreen> {
       final allTasks = tasksJson
           .map((taskJson) => Task.fromJson(json.decode(taskJson)))
           .toList();
-      setState(() {
-        _tasks = allTasks
-            .where((task) => task.libraryId == widget.library.id)
-            .toList();
-      });
+      if (mounted) {
+        setState(() {
+          _tasks = allTasks
+              .where((task) => task.libraryId == widget.library.id)
+              .toList();
+        });
+      }
     }
   }
 
@@ -43,16 +45,16 @@ class _LibraryDetailScreenState extends State<LibraryDetailScreen> {
     final prefs = await SharedPreferences.getInstance();
     final tasksJson = prefs.getStringList('tasks');
     if (tasksJson != null) {
-      final allTasks = tasksJson
+      List<Task> allTasks = tasksJson
           .map((taskJson) => Task.fromJson(json.decode(taskJson)))
           .toList();
-      final taskIndex = allTasks.indexWhere((t) => t.title == task.title); // Assuming titles are unique for now
+      int taskIndex = allTasks.indexWhere((t) => t.id == task.id);
       if (taskIndex != -1) {
         allTasks[taskIndex].libraryId = null;
         final updatedTasksJson =
             allTasks.map((t) => json.encode(t.toJson())).toList();
         await prefs.setStringList('tasks', updatedTasksJson);
-        _loadTasks();
+        await _loadTasks(); // Refresh the list
       }
     }
   }
@@ -80,8 +82,8 @@ class _LibraryDetailScreenState extends State<LibraryDetailScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          await context.push('/assign_tasks', extra: widget.library);
-          if (mounted) {
+          final result = await context.push('/assign_tasks', extra: widget.library);
+          if (result == true) {
             _loadTasks();
           }
         },

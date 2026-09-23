@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:todo_smart/main.dart';
+import 'package:todo_smart/task.dart';
 import 'package:todo_smart/task_library.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -40,8 +41,8 @@ class _CountdownScreenState extends State<CountdownScreen> {
 
     if (!kIsWeb) {
       _serviceSubscription = _service.on('update').listen((event) {
-        if (event != null && event.containsKey('remainingSeconds')) {
-          final int seconds = event['remainingSeconds'];
+        if (event != null && event.containsKey('remaining')) {
+          final int seconds = event['remaining'];
           if (seconds <= 0 && _isTimerRunning) {
             _onTimerFinish();
           }
@@ -134,10 +135,10 @@ class _CountdownScreenState extends State<CountdownScreen> {
     _startForegroundCountdown(duration);
 
     if (!kIsWeb) {
-      if (defaultTargetPlatform != TargetPlatform.android) {
-        windowManager.setAlwaysOnTop(true);
+      if (!Platform.isAndroid && !Platform.isIOS) {
+        await windowManager.setAlwaysOnTop(true);
       }
-      _service.startService();
+      await _service.startService();
       _service.invoke('start', {'endTime': endTime});
     }
   }
@@ -151,8 +152,8 @@ class _CountdownScreenState extends State<CountdownScreen> {
     _quoteTimer?.cancel();
 
     if (!kIsWeb) {
-      if (defaultTargetPlatform != TargetPlatform.android) {
-        windowManager.setAlwaysOnTop(false);
+      if (!Platform.isAndroid && !Platform.isIOS) {
+        await windowManager.setAlwaysOnTop(false);
       }
       _service.invoke('stop');
     }
@@ -194,8 +195,8 @@ class _CountdownScreenState extends State<CountdownScreen> {
     }
 
     if (!kIsWeb) {
-      if (defaultTargetPlatform != TargetPlatform.android) {
-        windowManager.setAlwaysOnTop(false);
+      if (!Platform.isAndroid && !Platform.isIOS) {
+        await windowManager.setAlwaysOnTop(false);
       }
     }
 
@@ -296,7 +297,7 @@ class _CountdownScreenState extends State<CountdownScreen> {
     await prefs.remove('countdown_end_time');
     await prefs.remove('running_task');
   }
-  
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -327,8 +328,8 @@ class _CountdownScreenState extends State<CountdownScreen> {
               child: Text(
                 '"$_currentQuote"',
                 textAlign: TextAlign.center,
-                style:
-                    theme.textTheme.bodyMedium?.copyWith(fontStyle: FontStyle.italic),
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(fontStyle: FontStyle.italic),
               ),
             ),
             const Spacer(),
